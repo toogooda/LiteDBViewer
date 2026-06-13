@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 
 var pathArg = args.FirstOrDefault(a => !a.StartsWith("-"));
 var maxRows = 20;
+var countOnly = args.Any(a => a.Equals("-C", StringComparison.OrdinalIgnoreCase));
 
 // Parse -M option
 var mArg = args.FirstOrDefault(a => a.StartsWith("-M"));
@@ -25,56 +26,74 @@ var dbFiles = Directory.EnumerateFiles(folderPath, "*.db", SearchOption.TopDirec
 var idToNameMap = new Dictionary<string, string>();
 var fileCounters = new Dictionary<string, int>();
 
-AnsiConsole.Status().Start("Indexing and resolving entities...", ctx =>
+if (!countOnly)
 {
-    foreach (var dbFile in dbFiles)
+    AnsiConsole.Status().Start("Indexing and resolving entities...", ctx =>
     {
-        var fileNameOnly = Path.GetFileNameWithoutExtension(dbFile);
-        try
+        foreach (var dbFile in dbFiles)
         {
-            using var db = new LiteDatabase($"Filename={dbFile};ReadOnly=true");
-            foreach (var colName in db.GetCollectionNames())
+            var fileNameOnly = Path.GetFileNameWithoutExtension(dbFile);
+            try
             {
-                var col = db.GetCollection(colName);
-                var docs = col.FindAll().ToList();
-                
-                foreach (var doc in docs)
+                using var db = new LiteDatabase($"Filename={dbFile};ReadOnly=true");
+                foreach (var colName in db.GetCollectionNames())
                 {
-                    var id = doc["_id"];
-                    string idStr = id.IsGuid ? id.AsGuid.ToString() : id.ToString();
+                    var col = db.GetCollection(colName);
+                    var docs = col.FindAll().ToList();
                     
-                    if (idToNameMap.ContainsKey(idStr)) continue;
-
-                    string? resolvedName = null;
-
-                    if (doc.ContainsKey("Name")) resolvedName = doc["Name"].AsString;
-                    else if (doc.ContainsKey("FirstName") || doc.ContainsKey("LastName"))
+                    foreach (var doc in docs)
                     {
-                        var first = doc.ContainsKey("FirstName") ? doc["FirstName"].AsString : "";
-                        var last = doc.ContainsKey("LastName") ? doc["LastName"].AsString : "";
-                        resolvedName = $"{first} {last}".Trim();
-                    }
+                        var id = doc["_id"];
+                        string idStr = id.IsGuid ? id.AsGuid.ToString() : id.ToString();
+                        
+                        if (idToNameMap.ContainsKey(idStr)) continue;
 
-                    if (string.IsNullOrWhiteSpace(resolvedName))
-                    {
-                        if (!fileCounters.ContainsKey(fileNameOnly)) fileCounters[fileNameOnly] = 1;
-                        resolvedName = $"{fileNameOnly}{fileCounters[fileNameOnly]++}";
-                    }
+                        string? resolvedName = null;
 
-                    idToNameMap[idStr] = resolvedName;
+                        if (doc.ContainsKey("Name")) resolvedName = doc["Name"].AsString;
+                        else if (doc.ContainsKey("FirstName") || doc.ContainsKey("LastName"))
+                        {
+                            var first = doc.ContainsKey("FirstName") ? doc["FirstName"].AsString : "";
+                            var last = doc.ContainsKey("LastName") ? doc["LastName"].AsString : "";
+                            resolvedName = $"{first} {last}".Trim();
+                        }
+
+                        if (string.IsNullOrWhiteSpace(resolvedName))
+                        {
+                            if (!fileCounters.ContainsKey(fileNameOnly)) fileCounters[fileNameOnly] = 1;
+                            resolvedName = $"{fileNameOnly}{fileCounters[fileNameOnly]++}";
+                        }
+
+                        idToNameMap[idStr] = resolvedName;
+                    }
                 }
-            }
-        } catch {}
-    }
-});
+            } catch {}
+        }
+    });
 
-AnsiConsole.MarkupLine($"[green]Indexed {idToNameMap.Count} unique entities. Showing max {maxRows} rows per collection.[/]\n");
+    AnsiConsole.MarkupLine($"[green]Indexed {idToNameMap.Count} unique entities. Showing max {maxRows} rows per collection.[/]\n");
+}
 
 foreach (var dbFile in dbFiles)
 {
     AnsiConsole.Write(new Rule($"[blue]File: {Path.GetFileName(dbFile)}[/]"));
     using var db = new LiteDatabase($"Filename={dbFile};ReadOnly=true");
     
+    if (countOnly)
+    {
+        var summaryTable = new Table().Border(TableBorder.Rounded).Expand();
+        summaryTable.AddColumn("[bold]Collection[/]");
+        summaryTable.AddColumn("[bold]Count[/]");
+
+        foreach (var colName in db.GetCollectionNames())
+        {
+            var col = db.GetCollection(colName);
+            summaryTable.AddRow($"[yellow]{colName}[/]", $"[green]{col.Count()}[/]");
+        }
+        AnsiConsole.Write(summaryTable);
+        continue;
+    }
+
     foreach (var colName in db.GetCollectionNames())
     {
         AnsiConsole.MarkupLine($"\n[yellow]Collection: {colName}[/]");
