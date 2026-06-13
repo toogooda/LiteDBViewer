@@ -14,7 +14,7 @@ var maxRows = 20;
 var countOnly = args.Any(a => a.Equals("-C", StringComparison.OrdinalIgnoreCase));
 
 // Parse -M option
-var mArg = args.FirstOrDefault(a => a.StartsWith("-M"));
+var mArg = args.FirstOrDefault(a => a.StartsWith("-M", StringComparison.OrdinalIgnoreCase));
 if (mArg != null && int.TryParse(mArg.Substring(2), out var parsedMax))
 {
     maxRows = parsedMax;
