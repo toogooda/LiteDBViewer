@@ -3,6 +3,12 @@ using Spectre.Console;
 using System.IO;
 using System.Text.RegularExpressions;
 
+if (args.Length == 0)
+{
+    ShowHelp();
+    return;
+}
+
 var pathArg = args.FirstOrDefault(a => !a.StartsWith("-"));
 var maxRows = 20;
 var countOnly = args.Any(a => a.Equals("-C", StringComparison.OrdinalIgnoreCase));
@@ -17,6 +23,7 @@ if (mArg != null && int.TryParse(mArg.Substring(2), out var parsedMax))
 if (string.IsNullOrEmpty(pathArg))
 {
     AnsiConsole.MarkupLine("[red]Error:[/] Please provide a folder path.");
+    ShowHelp();
     return;
 }
 
@@ -142,4 +149,25 @@ static string FormatValue(BsonValue val, Dictionary<string, string> map)
     if (str.StartsWith("{\"$numberLong\":")) return val.AsInt64.ToString();
 
     return str.Trim('"');
+}
+
+static void ShowHelp()
+{
+    var table = new Table().Border(TableBorder.Rounded);
+    table.AddColumn("[bold]Argument/Flag[/]");
+    table.AddColumn("[bold]Description[/]");
+    
+    table.AddRow("[yellow]<path>[/]", "The folder path to scan for LiteDB files (*.db).");
+    table.AddRow("[yellow]-C[/]", "Count-only mode. Displays collection summaries instead of data.");
+    table.AddRow("[yellow]-M<n>[/]", "Maximum rows to display per collection (default: 20).");
+
+    AnsiConsole.Write(
+        new Panel(
+            new Rows(
+                new Markup("[bold blue]LiteDBViewer Usage[/]"),
+                new Markup("\n[grey]LiteDBViewer.exe <path> [[-C]] [[-M<n>]][/]\n"),
+                table
+            )
+        ).Header("[bold white] HELP [/]").BorderColor(Color.Blue)
+    );
 }
