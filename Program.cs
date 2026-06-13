@@ -88,7 +88,7 @@ foreach (var dbFile in dbFiles)
         foreach (var colName in db.GetCollectionNames())
         {
             var col = db.GetCollection(colName);
-            summaryTable.AddRow(colName, col.Count().ToString());
+            summaryTable.AddRow($"[yellow]{colName}[/]", $"[green]{col.Count()}[/]");
         }
         AnsiConsole.Write(summaryTable);
         continue;
